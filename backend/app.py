@@ -79,7 +79,7 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     chunks = text_splitter.split_text(text)
     embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/embedding-001"
+    model="models/embedding-004"
 )
 
     # Create FAISS vector database
