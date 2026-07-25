@@ -16,9 +16,7 @@ load_dotenv()
 app = FastAPI()
 
 # Load embedding model
-embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+
 
 # Load Groq model
 llm = ChatGroq(
@@ -77,6 +75,9 @@ async def upload_pdf(file: UploadFile = File(...)):
     )
 
     chunks = text_splitter.split_text(text)
+    embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
 
     # Create FAISS vector database
     vector_db = FAISS.from_texts(chunks, embeddings)
