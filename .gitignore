@@ -1,0 +1,17 @@
+# Python
+venv/
+__pycache__/
+*.pyc
+
+# Environment variables
+.env
+backend/.env
+
+# Node
+node_modules/
+
+# Uploaded PDFs
+backend/uploads/
+
+# FAISS
+backend/faiss_index/
