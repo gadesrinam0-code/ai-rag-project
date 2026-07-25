@@ -28,7 +28,7 @@ function Home() {
       setLoading(true);
 
       const response = await axios.post(
-        "http://127.0.0.1:8000/ask",
+        "https://ai-rag-project-vhp0.onrender.com/ask",
         {
           question: question,
         }
