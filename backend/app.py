@@ -16,7 +16,10 @@ load_dotenv()
 app = FastAPI()
 
 # Load Groq model
-llm = ChatGroq(model_name="llama-3.3-70b-versatile", temperature=0)
+llm = ChatGroq(
+    model_name="llama-3.3-70b-versatile",
+    temperature=0
+)
 
 # Store FAISS database in memory
 vector_db = None
@@ -39,82 +42,100 @@ os.makedirs("uploads", exist_ok=True)
 
 @app.get("/")
 def home():
-  return {"message": "AI Knowledge Base Backend is Running 🚀"}
+    return {
+        "message": "AI Knowledge Base Backend is Running 🚀"
+    }
 
 
 @app.post("/upload")
 async def upload_pdf(file: UploadFile = File(...)):
-  global vector_db
+    global vector_db
 
-  # Save uploaded PDF
-  file_path = os.path.join("uploads", file.filename)
+    # Save uploaded PDF
+    file_path = os.path.join("uploads", file.filename)
 
-  with open(file_path, "wb") as buffer:
-    shutil.copyfileobj(file.file, buffer)
+    with open(file_path, "wb") as buffer:
+        shutil.copyfileobj(file.file, buffer)
 
-  # Read PDF
-  reader = PdfReader(file_path)
+    # Read PDF
+    reader = PdfReader(file_path)
 
-  text = ""
+    text = ""
 
-  for page in reader.pages:
-    page_text = page.extract_text()
+    for page in reader.pages:
+        page_text = page.extract_text()
 
-    if page_text:
-      text += page_text
+        if page_text:
+            text += page_text
 
-  # Split text into chunks
-  text_splitter = RecursiveCharacterTextSplitter(
-      chunk_size=500, chunk_overlap=50
-  )
+    # Split text into larger chunks (reduces API calls)
+    text_splitter = RecursiveCharacterTextSplitter(
+        chunk_size=1000,
+        chunk_overlap=100
+    )
 
-  chunks = text_splitter.split_text(text)
+    chunks = text_splitter.split_text(text)
 
-  # FIX 1: Fetch key from environment (supporting both GEMINI_API_KEY or GOOGLE_API_KEY)
-  api_key = os.getenv("GOOGLE_API_KEY")
+    api_key = os.getenv("GOOGLE_API_KEY")
 
-  # FIX 2: Use updated text embedding model format
-  embeddings = GoogleGenerativeAIEmbeddings(
-    model="models/gemini-embedding-001",
-    google_api_key=api_key,
-)
-  # Create FAISS vector database
-  vector_db = FAISS.from_texts(chunks, embeddings)
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="models/gemini-embedding-001",
+        google_api_key=api_key,
+    )
 
-  # Save vector database locally
-  vector_db.save_local("faiss_index")
+    try:
+        # Create FAISS vector database
+        vector_db = FAISS.from_texts(chunks, embeddings)
 
-  print("\n=========== VECTOR DATABASE ===========")
-  print("✅ FAISS Vector Database Created Successfully!")
-  print(f"Stored {len(chunks)} chunks.")
-  print("========================================\n")
+        # Save vector database locally
+        vector_db.save_local("faiss_index")
 
-  return {
-      "message": "PDF uploaded successfully",
-      "filename": file.filename,
-      "characters": len(text),
-      "chunks": len(chunks),
-  }
+        print("\n=========== VECTOR DATABASE ===========")
+        print("✅ FAISS Vector Database Created Successfully!")
+        print(f"Stored {len(chunks)} chunks.")
+        print("========================================\n")
+
+        return {
+            "message": "PDF uploaded successfully",
+            "filename": file.filename,
+            "characters": len(text),
+            "chunks": len(chunks),
+        }
+
+    except Exception as e:
+        print("\n========== EMBEDDING ERROR ==========")
+        print(type(e))
+        print(e)
+        print("=====================================\n")
+
+        return {
+            "message": "Embedding quota exceeded. Please wait 30-60 seconds and try uploading again.",
+            "error": str(e)
+        }
 
 
 class Question(BaseModel):
-  question: str
+    question: str
 
 
 @app.post("/ask")
 async def ask_question(data: Question):
-  global vector_db
+    global vector_db
 
-  if vector_db is None:
-    return {"answer": "Please upload a PDF first."}
+    if vector_db is None:
+        return {
+            "answer": "Please upload a PDF first."
+        }
 
-  # Search similar chunks
-  docs = vector_db.similarity_search(data.question, k=10)
+    # Search similar chunks
+    docs = vector_db.similarity_search(
+        data.question,
+        k=10
+    )
 
-  context = "\n\n".join(doc.page_content for doc in docs)
+    context = "\n\n".join(doc.page_content for doc in docs)
 
-  # Prompt for Groq
-  prompt = f"""
+    prompt = f"""
 You are an intelligent PDF assistant.
 
 Use ONLY the context below to answer.
@@ -134,15 +155,20 @@ Question:
 Answer:
 """
 
-  try:
-    response = llm.invoke(prompt)
+    try:
+        response = llm.invoke(prompt)
 
-    return {"question": data.question, "answer": response.content}
+        return {
+            "question": data.question,
+            "answer": response.content
+        }
 
-  except Exception as e:
-    print("\n========== GROQ ERROR ==========")
-    print(type(e))
-    print(e)
-    print("================================")
+    except Exception as e:
+        print("\n========== GROQ ERROR ==========")
+        print(type(e))
+        print(e)
+        print("================================")
 
-    return {"error": str(e)}
+        return {
+            "error": str(e)
+        }
