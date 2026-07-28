@@ -20,7 +20,7 @@ function UploadBox() {
 
     try {
       const response = await axios.post(
-        "https://ai-rag-project-1-otqj.onrender.com/upload",
+         "http://127.0.0.1:8000/upload",
         formData,
         {
           headers: {

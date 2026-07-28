@@ -4,7 +4,7 @@ from dotenv import load_dotenv
 from fastapi import FastAPI, File, UploadFile
 from fastapi.middleware.cors import CORSMiddleware
 from langchain_community.vectorstores import FAISS
-from langchain_community.embeddings import HuggingFaceEmbeddings
+from langchain_google_genai import GoogleGenerativeAIEmbeddings
 from langchain_groq import ChatGroq
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel
@@ -76,11 +76,12 @@ async def upload_pdf(file: UploadFile = File(...)):
 
     chunks = text_splitter.split_text(text)
 
-   
+    api_key = os.getenv("GOOGLE_API_KEY")
 
-    embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
+    embeddings = GoogleGenerativeAIEmbeddings(
+        model="models/gemini-embedding-001",
+        google_api_key=api_key,
+    )
 
     try:
         # Create FAISS vector database
@@ -108,9 +109,9 @@ async def upload_pdf(file: UploadFile = File(...)):
         print("=====================================\n")
 
         return {
-            "message": "Embedding quota exceeded. Please wait 30-60 seconds and try uploading again.",
-            "error": str(e)
-        }
+    "message": "Failed to create embeddings.",
+    "error": str(e)
+}
 
 
 class Question(BaseModel):
