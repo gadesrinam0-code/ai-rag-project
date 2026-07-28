@@ -21,16 +21,18 @@ llm = ChatGroq(
     temperature=0
 )
 
+# Load Hugging Face embedding model ONLY ONCE
+embeddings = HuggingFaceEmbeddings(
+    model_name="sentence-transformers/all-MiniLM-L6-v2"
+)
+
 # Store FAISS database in memory
 vector_db = None
 
-# Allow React frontend
+# CORS
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=[
-        "http://localhost:5173",
-        "https://ai-rag-project-psi.vercel.app",
-    ],
+    allow_origins=["*"],   # Change to your Vercel URL later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
@@ -51,42 +53,38 @@ def home():
 async def upload_pdf(file: UploadFile = File(...)):
     global vector_db
 
-    # Save uploaded PDF
-    file_path = os.path.join("uploads", file.filename)
-
-    with open(file_path, "wb") as buffer:
-        shutil.copyfileobj(file.file, buffer)
-
-    # Read PDF
-    reader = PdfReader(file_path)
-
-    text = ""
-
-    for page in reader.pages:
-        page_text = page.extract_text()
-
-        if page_text:
-            text += page_text
-
-    # Split text into larger chunks (reduces API calls)
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=100,
-    )
-
-    chunks = text_splitter.split_text(text)
-
-   
-
-    embeddings = HuggingFaceEmbeddings(
-    model_name="sentence-transformers/all-MiniLM-L6-v2"
-)
-
     try:
-        # Create FAISS vector database
-        vector_db = FAISS.from_texts(chunks, embeddings)
+        # Save uploaded PDF
+        file_path = os.path.join("uploads", file.filename)
 
-        # Save vector database locally
+        with open(file_path, "wb") as buffer:
+            shutil.copyfileobj(file.file, buffer)
+
+        # Read PDF
+        reader = PdfReader(file_path)
+
+        text = ""
+
+        for page in reader.pages:
+            page_text = page.extract_text()
+
+            if page_text:
+                text += page_text
+
+        # Split into chunks
+        text_splitter = RecursiveCharacterTextSplitter(
+            chunk_size=1000,
+            chunk_overlap=100,
+        )
+
+        chunks = text_splitter.split_text(text)
+
+        # Create FAISS vector store
+        vector_db = FAISS.from_texts(
+            chunks,
+            embeddings
+        )
+
         vector_db.save_local("faiss_index")
 
         print("\n=========== VECTOR DATABASE ===========")
@@ -108,7 +106,7 @@ async def upload_pdf(file: UploadFile = File(...)):
         print("=====================================\n")
 
         return {
-            "message": "Embedding quota exceeded. Please wait 30-60 seconds and try uploading again.",
+            "message": "Failed to create embeddings.",
             "error": str(e)
         }
 
@@ -126,13 +124,14 @@ async def ask_question(data: Question):
             "answer": "Please upload a PDF first."
         }
 
-    # Search similar chunks
     docs = vector_db.similarity_search(
         data.question,
         k=10
     )
 
-    context = "\n\n".join(doc.page_content for doc in docs)
+    context = "\n\n".join(
+        doc.page_content for doc in docs
+    )
 
     prompt = f"""
 You are an intelligent PDF assistant.
@@ -141,7 +140,7 @@ Use ONLY the context below to answer.
 
 If the user asks for a summary, summarize the available context.
 
-If the answer cannot be found in the provided context, reply:
+If the answer cannot be found in the provided context, reply exactly:
 
 "I couldn't find that information in the uploaded PDF."
 
