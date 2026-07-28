@@ -20,7 +20,7 @@ function UploadBox() {
 
     try {
       const response = await axios.post(
-         "https://YOUR-RAILWAY-DOMAIN/upload",
+      "https://ai-rag-project-production.up.railway.app/upload",   
         formData,
         {
           headers: {

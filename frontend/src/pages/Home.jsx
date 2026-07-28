@@ -28,7 +28,7 @@ function Home() {
       setLoading(true);
 
       const response = await axios.post(
-          "http://YOUR-RAILWAY-DOMAIN/ask", 
+          "https://ai-rag-project-production.up.railway.app/ask", 
         {
           question: question,
         }
