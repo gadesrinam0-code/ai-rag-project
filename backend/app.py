@@ -9,24 +9,28 @@ from langchain_groq import ChatGroq
 from langchain_text_splitters import RecursiveCharacterTextSplitter
 from pydantic import BaseModel
 from pypdf import PdfReader
+from tavily import TavilyClient
 
 # Load environment variables
 load_dotenv()
 
 app = FastAPI()
 
-# Load Groq model
+# Groq LLM
 llm = ChatGroq(
     model_name="llama-3.3-70b-versatile",
     temperature=0
 )
 
-# Load Hugging Face embedding model ONLY ONCE
+# Tavily Client
+tavily = TavilyClient(api_key=os.getenv("TAVILY_API_KEY"))
+
+# Embedding model
 embeddings = HuggingFaceEmbeddings(
     model_name="sentence-transformers/all-MiniLM-L6-v2"
 )
 
-# Store FAISS database in memory
+# Vector DB
 vector_db = None
 
 # CORS
@@ -42,7 +46,6 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create uploads folder
 os.makedirs("uploads", exist_ok=True)
 
 
@@ -58,13 +61,11 @@ async def upload_pdf(file: UploadFile = File(...)):
     global vector_db
 
     try:
-        # Save uploaded PDF
         file_path = os.path.join("uploads", file.filename)
 
         with open(file_path, "wb") as buffer:
             shutil.copyfileobj(file.file, buffer)
 
-        # Read PDF
         reader = PdfReader(file_path)
 
         text = ""
@@ -75,26 +76,19 @@ async def upload_pdf(file: UploadFile = File(...)):
             if page_text:
                 text += page_text
 
-        # Split into chunks
-        text_splitter = RecursiveCharacterTextSplitter(
+        splitter = RecursiveCharacterTextSplitter(
             chunk_size=1000,
             chunk_overlap=100,
         )
 
-        chunks = text_splitter.split_text(text)
+        chunks = splitter.split_text(text)
 
-        # Create FAISS vector store
         vector_db = FAISS.from_texts(
             chunks,
             embeddings
         )
 
         vector_db.save_local("faiss_index")
-
-        print("\n=========== VECTOR DATABASE ===========")
-        print("✅ FAISS Vector Database Created Successfully!")
-        print(f"Stored {len(chunks)} chunks.")
-        print("========================================\n")
 
         return {
             "message": "PDF uploaded successfully",
@@ -104,19 +98,33 @@ async def upload_pdf(file: UploadFile = File(...)):
         }
 
     except Exception as e:
-        print("\n========== EMBEDDING ERROR ==========")
-        print(type(e))
-        print(e)
-        print("=====================================\n")
-
         return {
-            "message": "Failed to create embeddings.",
+            "message": "Upload failed",
+            "error": str(e)
+        }
+
+
+# Test Tavily
+@app.get("/websearch")
+def web_search(query: str):
+    try:
+        result = tavily.search(
+            query=query,
+            search_depth="basic",
+            max_results=3
+        )
+
+        return result
+
+    except Exception as e:
+        return {
             "error": str(e)
         }
 
 
 class Question(BaseModel):
     question: str
+    use_web: bool = False
 
 
 @app.post("/ask")
@@ -128,28 +136,77 @@ async def ask_question(data: Question):
             "answer": "Please upload a PDF first."
         }
 
+    # ------------------------
+    # Search PDF
+    # ------------------------
+
     docs = vector_db.similarity_search(
         data.question,
-        k=10
+        k=5
     )
 
-    context = "\n\n".join(
+    pdf_context = "\n\n".join(
         doc.page_content for doc in docs
     )
 
+    # ------------------------
+    # Search Web (only if enabled)
+    # ------------------------
+
+    web_context = ""
+
+    if data.use_web:
+        try:
+            results = tavily.search(
+                query=data.question,
+                search_depth="basic",
+                max_results=3
+            )
+
+            for item in results["results"]:
+                web_context += f"""
+Title:
+{item['title']}
+
+Content:
+{item['content']}
+
+URL:
+{item['url']}
+
+"""
+
+        except Exception as e:
+            print("Tavily Error:", e)
+
+    # ------------------------
+    # Prompt
+    # ------------------------
+
     prompt = f"""
-You are an intelligent PDF assistant.
+You are an AI Research Assistant.
 
-Use ONLY the context below to answer.
+Instructions:
 
-If the user asks for a summary, summarize the available context.
+1. Always use the uploaded PDF as the primary source.
+2. If Web Context is available, use it to supplement the answer.
+3. If Web Context is empty, answer using only the PDF.
+4. If the answer is not available in the PDF or Web Context, clearly say so.
+5. Never make up information.
 
-If the answer cannot be found in the provided context, reply exactly:
+==========================
+PDF Context
+==========================
 
-"I couldn't find that information in the uploaded PDF."
+{pdf_context}
 
-Context:
-{context}
+==========================
+Web Context
+==========================
+
+{web_context}
+
+==========================
 
 Question:
 {data.question}
@@ -158,6 +215,7 @@ Answer:
 """
 
     try:
+
         response = llm.invoke(prompt)
 
         return {
@@ -166,10 +224,6 @@ Answer:
         }
 
     except Exception as e:
-        print("\n========== GROQ ERROR ==========")
-        print(type(e))
-        print(e)
-        print("================================")
 
         return {
             "error": str(e)

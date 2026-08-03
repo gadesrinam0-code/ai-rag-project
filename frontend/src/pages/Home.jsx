@@ -7,6 +7,7 @@ import UploadBox from "../components/UploadBox";
 
 function Home() {
   const [question, setQuestion] = useState("");
+  const [useWeb, setUseWeb] = useState(false);
 
   const [messages, setMessages] = useState([
     {
@@ -28,9 +29,10 @@ function Home() {
       setLoading(true);
 
       const response = await axios.post(
-          "https://ai-rag-project-production.up.railway.app/ask", 
+        "https://ai-rag-project-production.up.railway.app/ask",
         {
           question: question,
+          use_web: useWeb,
         }
       );
 
@@ -113,7 +115,9 @@ function Home() {
                     }`}
                   >
                     <p className="text-xs font-semibold mb-2 opacity-70">
-                      {msg.sender === "user" ? "👤 You" : "🤖 AI Assistant"}
+                      {msg.sender === "user"
+                        ? "👤 You"
+                        : "🤖 AI Assistant"}
                     </p>
 
                     <p className="whitespace-pre-wrap leading-relaxed">
@@ -124,6 +128,19 @@ function Home() {
               ))}
 
               <div ref={chatEndRef}></div>
+            </div>
+
+            {/* Web Search Toggle */}
+            <div className="mb-4">
+              <label className="flex items-center gap-2 text-gray-700 cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={useWeb}
+                  onChange={(e) => setUseWeb(e.target.checked)}
+                  className="w-4 h-4"
+                />
+                🌐 Use Web Search
+              </label>
             </div>
 
             <textarea
