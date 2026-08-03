@@ -1,4 +1,4 @@
-# 🤖 AI Hybrid RAG Project
+# 🤖 AI RAG Project
 
 An AI-powered **Hybrid Retrieval-Augmented Generation (RAG)** application that enables users to upload PDF documents, perform optional live web searches, and receive intelligent, context-aware answers using Groq LLM.
 
