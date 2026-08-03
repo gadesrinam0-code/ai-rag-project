@@ -172,6 +172,4 @@ This project was built using:
 - Vercel
 - Railway
 
----
 
-# ⭐ If you found this project useful, consider giving it a star on GitHub!
