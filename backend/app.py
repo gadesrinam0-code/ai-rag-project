@@ -160,25 +160,18 @@ async def ask_question(data: Question):
 
     if data.use_web:
         try:
-            # Build a better search query using the PDF context
-            search_query = f"""
-Topic from the PDF:
-{pdf_context[:800]}
+            # Use a simple, focused search query
+            search_query = f"{data.question} latest research 2025 2026"
 
-User Question:
-{data.question}
-
-Search for recent information, examples, latest developments,
-best practices, and additional concepts related to this topic.
-"""
+            print("Search Query:", search_query)
 
             results = tavily.search(
                 query=search_query,
                 search_depth="advanced",
-                max_results=5
+                max_results=8
             )
 
-            print(results)
+            print("Tavily Results:",results)
 
             for item in results["results"]:
                 web_context += f"""
