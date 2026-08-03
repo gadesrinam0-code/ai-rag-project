@@ -129,6 +129,8 @@ class Question(BaseModel):
 
 @app.post("/ask")
 async def ask_question(data: Question):
+    print("Question:", data.question)
+    print("Use Web:", data.use_web)
     global vector_db
 
     if vector_db is None:
