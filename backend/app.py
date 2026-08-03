@@ -38,8 +38,8 @@ app.add_middleware(
     CORSMiddleware,
     allow_origins=[
         "http://localhost:5173",
-        "https://ai-rag-project-j9adblqhn-gadesrinam0-3714s-projects.vercel.app",
-        "https://ai-rag-project-psi.vercel.app",
+         "https://ai-rag-project-psi.vercel.app",
+         "https://ai-rag-project-kiyzq9wsg-gadesrinam0-3714s-projects.vercel.app",
     ],
     allow_credentials=True,
     allow_methods=["*"],
