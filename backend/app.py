@@ -131,6 +131,7 @@ class Question(BaseModel):
 async def ask_question(data: Question):
     print("Question:", data.question)
     print("Use Web:", data.use_web)
+
     global vector_db
 
     if vector_db is None:
@@ -159,11 +160,25 @@ async def ask_question(data: Question):
 
     if data.use_web:
         try:
+            # Build a better search query using the PDF context
+            search_query = f"""
+Topic from the PDF:
+{pdf_context[:800]}
+
+User Question:
+{data.question}
+
+Search for recent information, examples, latest developments,
+best practices, and additional concepts related to this topic.
+"""
+
             results = tavily.search(
-                query=data.question,
-                search_depth="basic",
-                max_results=3
+                query=search_query,
+                search_depth="advanced",
+                max_results=5
             )
+
+            print(results)
 
             for item in results["results"]:
                 web_context += f"""
@@ -188,13 +203,33 @@ URL:
     prompt = f"""
 You are an AI Research Assistant.
 
+Your task is to answer questions using the uploaded PDF and, when available,
+web search results.
+
 Instructions:
 
-1. Always use the uploaded PDF as the primary source.
-2. If Web Context is available, use it to supplement the answer.
-3. If Web Context is empty, answer using only the PDF.
-4. If the answer is not available in the PDF or Web Context, clearly say so.
-5. Never make up information.
+1. First answer using the uploaded PDF.
+2. If Web Context is available, provide ONLY additional information that is NOT already present in the PDF.
+3. Include:
+   - recent developments
+   - latest techniques
+   - examples
+   - best practices
+   - real-world applications
+4. Do NOT repeat information from the PDF.
+5. If no useful web information exists, say:
+   "No additional relevant information was found from web sources."
+
+Format your answer like this:
+
+## 📄 Information from the PDF
+...
+
+## 🌐 Additional Information from the Web
+...
+
+## 💡 Key Takeaways
+...
 
 ==========================
 PDF Context
@@ -217,7 +252,6 @@ Answer:
 """
 
     try:
-
         response = llm.invoke(prompt)
 
         return {
@@ -226,7 +260,6 @@ Answer:
         }
 
     except Exception as e:
-
         return {
             "error": str(e)
         }
