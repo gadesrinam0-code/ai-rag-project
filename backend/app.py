@@ -39,7 +39,7 @@ app.add_middleware(
       allow_origins=[
         "http://localhost:5173",
         "https://ai-rag-project-psi.vercel.app",
-        "https://ai-rag-project-j9adblqhn-gadesrinam0-3714s-projects.vercel.app",
+
         "https://ai-rag-project-opdye221x-gadesrinam0-3714s-projects.vercel.app",
     ],
     allow_credentials=False,
