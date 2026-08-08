@@ -2,26 +2,27 @@ import { useState } from "react";
 import axios from "axios";
 
 function UploadBox() {
-  const [fileName, setFileName] = useState("");
+  const [fileNames, setFileNames] = useState([]);
 
   const handleUpload = async (event) => {
-    const file = event.target.files[0];
+    const files = Array.from(event.target.files);
 
-    if (!file) {
-      alert("Please select a PDF.");
+    if (files.length === 0) {
+      alert("Please select at least one PDF.");
       return;
     }
 
-    // Save uploaded file name
-    setFileName(file.name);
+    setFileNames(files.map((file) => file.name));
 
     const formData = new FormData();
-    formData.append("file", file);
+
+    files.forEach((file) => {
+      formData.append("files", file);
+    });
 
     try {
       const response = await axios.post(
-        "https://ai-rag-project-production.up.railway.app/upload",
-
+        "http://127.0.0.1:8000/upload",
         formData,
         {
           headers: {
@@ -31,7 +32,6 @@ function UploadBox() {
       );
 
       console.log(response.data);
-
       alert(response.data.message);
     } catch (error) {
       console.error(error);
@@ -45,23 +45,30 @@ function UploadBox() {
   };
 
   return (
-    <div className="mb-6">
+    <div className="space-y-4">
       <input
         type="file"
         accept=".pdf"
+        multiple
         onChange={handleUpload}
-        className="mb-4"
       />
 
-      {fileName && (
+      {fileNames.length > 0 && (
         <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 shadow-sm">
           <p className="text-sm text-gray-500">
-            Uploaded Document
+            Uploaded Documents
           </p>
 
-          <p className="text-blue-700 font-semibold mt-1">
-            📄 {fileName}
-          </p>
+          <div className="mt-2 space-y-1">
+            {fileNames.map((name, index) => (
+              <p
+                key={index}
+                className="text-blue-700 font-semibold"
+              >
+                📄 {name}
+              </p>
+            ))}
+          </div>
         </div>
       )}
     </div>
