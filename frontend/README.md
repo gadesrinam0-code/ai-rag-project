@@ -1,17 +1,40 @@
-# React + Vite
+# 📚 AI Research Assistant — Multi-PDF RAG Chatbot
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+An AI-powered Research Assistant that allows users to upload research papers, ask questions about them, compare multiple PDFs, maintain conversational context, and optionally use web search for up-to-date information.
 
-Currently, two official plugins are available:
+## 🚀 Features
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Oxc](https://oxc.rs)
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/)
+- 📄 Upload and process PDF research papers
+- 🔎 Retrieval-Augmented Generation (RAG)
+- 🧠 Semantic search using embeddings
+- 💬 Conversational question answering
+- 🔄 Context-aware follow-up questions
+- 📚 Multi-PDF comparison
+- 🎯 Select specific documents for retrieval
+- 🌐 Optional web search
+- 📑 Display PDF sources and page references
+- ⚡ Fast AI responses using Groq
+- 🖥️ Modern React frontend
 
-## React Compiler
+## 🏗️ System Architecture
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
-
-## Expanding the ESLint configuration
-
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
-Last deployment: August 2026
+```text
+User
+  ↓
+React Frontend
+  ↓
+FastAPI Backend
+  ↓
+PDF Processing
+  ↓
+Text Chunking
+  ↓
+Sentence Transformers
+  ↓
+FAISS Vector Database
+  ↓
+Semantic Retrieval
+  ↓
+Groq LLM
+  ↓
+AI Generated Answer
