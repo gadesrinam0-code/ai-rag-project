@@ -1,4 +1,3 @@
-// Trigger Vercel redeploy
 import { useState, useRef, useEffect } from "react";
 import axios from "axios";
 
@@ -26,40 +25,68 @@ function Home() {
       return;
     }
 
+    const currentQuestion = question.trim();
+
     try {
       setLoading(true);
 
       const response = await axios.post(
         "https://ai-rag-project-production.up.railway.app/ask",
         {
-          question: question,
+          question: currentQuestion,
           use_web: useWeb,
         }
       );
 
-      console.log(response.data);
+      console.log("Backend response:", response.data);
+
+      // Safely handle an empty/null backend response
+      const answer =
+        response?.data?.answer ||
+        "The backend did not return an answer.";
 
       setMessages((prev) => [
         ...prev,
         {
           sender: "user",
-          text: question,
+          text: currentQuestion,
         },
         {
           sender: "ai",
-          text: response.data.answer,
+          text: answer,
         },
       ]);
 
       setQuestion("");
     } catch (error) {
-      console.error(error);
+      console.error("Ask error:", error);
 
-      if (error.response) {
-        alert(JSON.stringify(error.response.data));
-      } else {
-        alert(error.message);
+      let errorMessage = "Something went wrong while asking the question.";
+
+      if (error.response?.data) {
+        if (typeof error.response.data === "string") {
+          errorMessage = error.response.data;
+        } else if (error.response.data.detail) {
+          errorMessage =
+            typeof error.response.data.detail === "string"
+              ? error.response.data.detail
+              : JSON.stringify(error.response.data.detail);
+        }
+      } else if (error.message) {
+        errorMessage = error.message;
       }
+
+      setMessages((prev) => [
+        ...prev,
+        {
+          sender: "user",
+          text: currentQuestion,
+        },
+        {
+          sender: "ai",
+          text: `Error: ${errorMessage}`,
+        },
+      ]);
     } finally {
       setLoading(false);
     }
@@ -137,20 +164,28 @@ function Home() {
                 <input
                   type="checkbox"
                   checked={useWeb}
-                  onChange={(e) => setUseWeb(e.target.checked)}
+                  onChange={(e) =>
+                    setUseWeb(e.target.checked)
+                  }
                   className="w-4 h-4"
                 />
+
                 🌐 Use Web Search
               </label>
             </div>
 
+            {/* Question */}
             <textarea
               value={question}
-              onChange={(e) => setQuestion(e.target.value)}
+              onChange={(e) =>
+                setQuestion(e.target.value)
+              }
               placeholder="Ask a question about your PDF..."
               className="w-full border rounded-lg p-3 h-32 resize-none"
+              disabled={loading}
             />
 
+            {/* Buttons */}
             <div className="mt-4 flex gap-4">
               <button
                 onClick={askQuestion}
