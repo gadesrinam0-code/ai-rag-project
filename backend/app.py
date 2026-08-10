@@ -235,13 +235,196 @@ def home():
 # MULTI-PDF UPLOAD
 # ============================================================
 
+# ============================================================
+# SINGLE-PDF UPLOAD
+# ============================================================
+
 @app.post("/upload")
 async def upload_pdf(
     files: Annotated[
         list[UploadFile],
-        File(description="Multiple PDF files")
+        File(description="One PDF file")
     ]
 ):
+
+    global vector_db
+
+    try:
+
+        # ----------------------------------------------------
+        # CHECK FILE
+        # ----------------------------------------------------
+
+        if not files:
+            return {
+                "message": "No PDF file was uploaded.",
+                "files": [],
+                "total_files": 0,
+                "total_pages": 0,
+                "chunks": 0,
+                "document_stats": []
+            }
+
+        # ----------------------------------------------------
+        # USE ONLY THE FIRST PDF
+        # ----------------------------------------------------
+
+        file = files[0]
+
+        if not file.filename:
+            return {
+                "message": "Invalid PDF file.",
+                "files": [],
+                "total_files": 0,
+                "total_pages": 0,
+                "chunks": 0,
+                "document_stats": []
+            }
+
+        if not file.filename.lower().endswith(".pdf"):
+            return {
+                "message": "Only PDF files are allowed.",
+                "files": [],
+                "total_files": 0,
+                "total_pages": 0,
+                "chunks": 0,
+                "document_stats": []
+            }
+
+        # ----------------------------------------------------
+        # REMOVE ALL PREVIOUS PDFs
+        # ----------------------------------------------------
+
+        os.makedirs("uploads", exist_ok=True)
+
+        for old_filename in os.listdir("uploads"):
+
+            if old_filename.lower().endswith(".pdf"):
+
+                old_path = os.path.join(
+                    "uploads",
+                    old_filename
+                )
+
+                try:
+
+                    os.remove(old_path)
+
+                    print(
+                        "Removed previous PDF:",
+                        old_filename
+                    )
+
+                except Exception as e:
+
+                    print(
+                        "Could not remove old PDF:",
+                        old_filename,
+                        e
+                    )
+
+        # ----------------------------------------------------
+        # SAVE THE NEW PDF
+        # ----------------------------------------------------
+
+        safe_filename = os.path.basename(
+            file.filename
+        )
+
+        file_path = os.path.join(
+            "uploads",
+            safe_filename
+        )
+
+        with open(
+            file_path,
+            "wb"
+        ) as buffer:
+
+            shutil.copyfileobj(
+                file.file,
+                buffer
+            )
+
+        print(
+            "Uploaded single PDF:",
+            safe_filename
+        )
+
+        # ----------------------------------------------------
+        # REBUILD RAG
+        # ----------------------------------------------------
+
+        stats = rebuild_vector_database()
+
+        # ----------------------------------------------------
+        # DOCUMENT STATS
+        # ----------------------------------------------------
+
+        document_stats = []
+
+        try:
+
+            reader = PdfReader(
+                file_path
+            )
+
+            pages = len(
+                reader.pages
+            )
+
+            chunks = 0
+
+            if vector_db is not None:
+
+                for doc in vector_db.docstore._dict.values():
+
+                    if (
+                        doc.metadata.get("source")
+                        == safe_filename
+                    ):
+
+                        chunks += 1
+
+            document_stats.append(
+                {
+                    "filename": safe_filename,
+                    "pages": pages,
+                    "chunks": chunks
+                }
+            )
+
+        except Exception as e:
+
+            print(
+                "Document stats error:",
+                e
+            )
+
+        # ----------------------------------------------------
+        # RESPONSE
+        # ----------------------------------------------------
+
+        return {
+            "message": "PDF uploaded successfully",
+            "files": [safe_filename],
+            "total_files": 1,
+            "total_pages": stats["pages"],
+            "chunks": stats["chunks"],
+            "document_stats": document_stats
+        }
+
+    except Exception as e:
+
+        print(
+            "Upload Error:",
+            e
+        )
+
+        return {
+            "message": "Upload failed",
+            "error": str(e)
+        }
 
     try:
 
@@ -916,7 +1099,7 @@ Original query:
         )
 
         # Keep up to 4 relevant chunks from THIS PDF.
-        selected_for_document = document_results[:4]
+        selected_for_document = document_results[:8]
 
         print(
             "Selected chunks from",
@@ -1349,163 +1532,106 @@ ANSWER
     # ========================================================
 
     else:
-
-        prompt = f"""
+       prompt = f"""
 You are a strict PDF-based AI Research Assistant.
 
-Answer the user's CURRENT question using ONLY the
-PDF CONTEXT.
+Answer the user's CURRENT question using ONLY the PDF CONTEXT.
 
-You may use the PREVIOUS CONVERSATION ONLY to understand
-what words such as "it", "this", "that", "they", or
-"the method" refer to.
+IMPORTANT RULES:
 
-Previous conversation is NOT evidence.
-
-============================================================
-STRICT GROUNDING RULES
-============================================================
-
-1. Use ONLY the PDF CONTEXT for factual information.
+1. Use ONLY information explicitly supported by the PDF CONTEXT.
 
 2. Do NOT use your own general knowledge.
 
 3. Do NOT use information from the internet.
 
-4. Do NOT guess or assume missing information.
+4. Do NOT guess, assume, or invent missing information.
 
-5. Do NOT add facts that are not supported by the PDF.
+5. Previous conversation may ONLY be used to understand references
+   such as "it", "this", "that", "they", or "the paper".
+   Previous conversation is NOT factual evidence.
 
-6. Use previous conversation only to resolve references.
+6. When multiple PDFs are provided, clearly separate information
+   from each paper and do not mix their facts.
 
-7. If the PDF CONTEXT does not contain enough
-   information to answer the user's question,
-   respond ONLY with:
+7. Give a COMPLETE and DETAILED answer.
+   Do NOT intentionally make the answer short.
+
+8. For questions asking about a paper's objective, purpose,
+   methodology, contributions, findings, or significance,
+   explain the answer in several paragraphs or numbered points
+   when the PDF context supports it.
+
+9. For "What is this paper about?" explain, when supported:
+   - what the paper studies
+   - the problem or motivation
+   - the proposed approach
+   - important findings
+   - main contributions
+
+10. For "main contributions", explain EACH contribution separately.
+    Do not merely list the contribution names.
+
+11. For "compare these papers", explain each paper first and then
+    provide a detailed comparison.
+
+12. Do NOT add facts just to make the answer longer.
+    Every factual statement must come from the PDF CONTEXT.
+
+13. If the PDF CONTEXT genuinely does not contain enough
+    information to answer the question, respond ONLY with:
 
 The available PDF content does not contain enough
 information to answer this question.
 
-8. If rule 7 applies, DO NOT provide:
-   - Key Takeaways
-   - Summary
-   - Related information
-   - Guesses
-   - Additional facts
-   - Citations
-   - Sources
+14. If there is enough information, use this structure when useful:
 
-9. If the PDF contains enough information,
-   answer directly and clearly.
+## 📄 Detailed Answer
 
-10. Keep the answer directly related to the question.
-
-============================================================
-ANSWER FORMAT
-============================================================
-
-IF THE PDF CONTAINS ENOUGH INFORMATION:
-
-## 📄 Information from the PDF
-
-[Answer using ONLY the PDF context]
+[Give a thorough answer based ONLY on the PDF CONTEXT.]
 
 ## 💡 Key Takeaways
 
-[2–4 points directly related to the answer]
+- [Important supported point]
+- [Important supported point]
+- [Important supported point]
+- [Additional supported point if useful]
 
-IF THE PDF DOES NOT CONTAIN ENOUGH INFORMATION:
+15. For multiple PDFs, use:
 
-The available PDF content does not contain enough
-information to answer this question.
+## 📄 Paper 1
 
-DO NOT ADD ANYTHING ELSE.
+[Detailed answer based on Paper 1.]
 
-============================================================
-PREVIOUS CONVERSATION
-============================================================
+## 📄 Paper 2
 
+[Detailed answer based on Paper 2.]
+
+## 🔎 Comparison
+
+[Detailed comparison based only on the PDFs.]
+
+## 💡 Key Takeaways
+
+- [Supported comparison point]
+- [Supported comparison point]
+- [Supported comparison point]
+
+16. Never use bibliography entries or references as evidence
+    for a paper's own contributions unless the PDF explicitly
+    states the contribution.
+
+17. Stay focused on the user's question.
+
+PREVIOUS CONVERSATION:
 {chat_history_text}
 
-============================================================
-PDF CONTEXT
-============================================================
-
+PDF CONTEXT:
 {pdf_context}
 
-============================================================
-CURRENT QUESTION
-============================================================
-
+CURRENT USER QUESTION:
 {data.question}
-
-============================================================
-ANSWER
-============================================================
 """
+      
 
-    # ========================================================
-    # GENERATE FINAL ANSWER
-    # ========================================================
-
-    try:
-
-        response = llm.invoke(
-            prompt
-        )
-
-        final_answer = response.content.strip()
-
-        # ====================================================
-        # DETECT UNSUPPORTED ANSWER
-        # ====================================================
-
-        no_answer_phrases = [
-            "the available pdf content does not contain enough information",
-            "the answer could not be found in the uploaded documents",
-            "does not contain enough information to answer"
-        ]
-
-        is_no_answer = any(
-            phrase in final_answer.lower()
-            for phrase in no_answer_phrases
-        )
-
-        # ====================================================
-        # RETURN CLEAN NO-ANSWER RESPONSE
-        # ====================================================
-
-        if is_no_answer:
-
-            return {
-                "question": data.question,
-                "answer": (
-                    "The available PDF content does not contain "
-                    "enough information to answer this question."
-                ),
-                "sources": [],
-                "web_sources": []
-            }
-
-        # ====================================================
-        # NORMAL ANSWER
-        # ====================================================
-
-        return {
-            "question": data.question,
-            "answer": final_answer,
-            "sources": pdf_sources,
-            "web_sources": web_sources
-        }
-
-    except Exception as e:
-
-        print(
-            "LLM Error:",
-            e
-        )
-
-        return {
-            "error": str(e),
-            "sources": [],
-            "web_sources": []
-        }
+        
