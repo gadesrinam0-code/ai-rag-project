@@ -46,7 +46,7 @@ function UploadBox({
 
     try {
       const response = await axios.post(
-        "http://127.0.0.1:8000/upload",
+        "https://ai-rag-project-production.up.railway.app/upload",
         formData,
         {
           headers: {
@@ -173,9 +173,8 @@ function UploadBox({
     try {
 
       const response = await axios.delete(
-        `http://127.0.0.1:8000/delete/${encodeURIComponent(
-          filename
-        )}`
+        `https://ai-rag-project-production.up.railway.app/delete/${encodeURIComponent(filename)}`
+        
       );
 
       console.log(
