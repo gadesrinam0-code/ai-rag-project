@@ -27,7 +27,7 @@ load_dotenv()
 
 
 # ============================================================
-# FASTAPI APP
+# FASTAPI
 # ============================================================
 
 app = FastAPI()
@@ -53,14 +53,11 @@ app.add_middleware(
 UPLOAD_DIR = "uploads"
 FAISS_DIR = "faiss_index"
 
-os.makedirs(
-    UPLOAD_DIR,
-    exist_ok=True
-)
+os.makedirs(UPLOAD_DIR, exist_ok=True)
 
 
 # ============================================================
-# GROQ LLM
+# GROQ
 # ============================================================
 
 llm = ChatGroq(
@@ -73,23 +70,16 @@ llm = ChatGroq(
 # TAVILY
 # ============================================================
 
-tavily_api_key = os.getenv(
-    "TAVILY_API_KEY"
-)
+tavily_api_key = os.getenv("TAVILY_API_KEY")
 
 tavily = None
 
 if tavily_api_key:
-
     tavily = TavilyClient(
         api_key=tavily_api_key
     )
-
 else:
-
-    print(
-        "WARNING: TAVILY_API_KEY not found."
-    )
+    print("WARNING: TAVILY_API_KEY not found.")
 
 
 # ============================================================
@@ -129,7 +119,7 @@ def rebuild_vector_database():
     ]
 
     # --------------------------------------------------------
-    # Safety: only use ONE PDF
+    # SINGLE PDF MODE
     # --------------------------------------------------------
 
     if len(pdf_files) > 1:
@@ -158,7 +148,6 @@ def rebuild_vector_database():
             )
 
             try:
-
                 os.remove(old_path)
 
                 print(
@@ -171,13 +160,13 @@ def rebuild_vector_database():
                 print(
                     "Could not remove:",
                     filename,
-                    e
+                    repr(e)
                 )
 
         pdf_files = [keep_file]
 
     # --------------------------------------------------------
-    # No PDFs
+    # No PDF
     # --------------------------------------------------------
 
     if not pdf_files:
@@ -187,16 +176,11 @@ def rebuild_vector_database():
         if os.path.exists(FAISS_DIR):
 
             try:
-
-                shutil.rmtree(
-                    FAISS_DIR
-                )
-
+                shutil.rmtree(FAISS_DIR)
             except Exception as e:
-
                 print(
                     "FAISS cleanup error:",
-                    e
+                    repr(e)
                 )
 
         return {
@@ -206,7 +190,7 @@ def rebuild_vector_database():
         }
 
     # --------------------------------------------------------
-    # Read the single PDF
+    # Read PDF
     # --------------------------------------------------------
 
     filename = pdf_files[0]
@@ -233,27 +217,29 @@ def rebuild_vector_database():
 
             page_text = page.extract_text()
 
-            if page_text:
+            if not page_text:
+                continue
 
-                page_text = page_text.strip()
+            page_text = page_text.strip()
 
-                if page_text:
+            if not page_text:
+                continue
 
-                    all_documents.append(
-                        Document(
-                            page_content=page_text,
-                            metadata={
-                                "source": filename,
-                                "page": page_number + 1
-                            }
-                        )
-                    )
+            all_documents.append(
+                Document(
+                    page_content=page_text,
+                    metadata={
+                        "source": filename,
+                        "page": page_number + 1
+                    }
+                )
+            )
 
     except Exception as e:
 
         print(
             "PDF reading error:",
-            e
+            repr(e)
         )
 
         vector_db = None
@@ -265,7 +251,7 @@ def rebuild_vector_database():
         }
 
     # --------------------------------------------------------
-    # No extractable text
+    # No text
     # --------------------------------------------------------
 
     if not all_documents:
@@ -283,12 +269,12 @@ def rebuild_vector_database():
         }
 
     # --------------------------------------------------------
-    # Split into chunks
+    # Split
     # --------------------------------------------------------
 
     splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=150
+        chunk_size=1200,
+        chunk_overlap=200
     )
 
     split_documents = splitter.split_documents(
@@ -306,17 +292,13 @@ def rebuild_vector_database():
     )
 
     # --------------------------------------------------------
-    # Create FAISS
+    # FAISS
     # --------------------------------------------------------
 
     vector_db = FAISS.from_documents(
         split_documents,
         embeddings
     )
-
-    # --------------------------------------------------------
-    # Save FAISS
-    # --------------------------------------------------------
 
     vector_db.save_local(
         FAISS_DIR
@@ -361,9 +343,8 @@ def startup_rebuild():
 def home():
 
     return {
-        "message": (
+        "message":
             "AI Knowledge Base Backend is Running 🚀"
-        )
     }
 
 
@@ -375,7 +356,7 @@ def home():
 async def upload_pdf(
     files: Annotated[
         list[UploadFile],
-        File(description="One PDF file")
+        File(description="Upload one PDF")
     ]
 ):
 
@@ -384,7 +365,7 @@ async def upload_pdf(
     try:
 
         # ----------------------------------------------------
-        # Validate upload
+        # Validate
         # ----------------------------------------------------
 
         if not files:
@@ -394,12 +375,11 @@ async def upload_pdf(
                 "files": [],
                 "total_files": 0,
                 "total_pages": 0,
-                "chunks": 0,
-                "document_stats": []
+                "chunks": 0
             }
 
         # ----------------------------------------------------
-        # Use only the first file
+        # ONLY FIRST FILE
         # ----------------------------------------------------
 
         file = files[0]
@@ -411,35 +391,28 @@ async def upload_pdf(
                 "files": [],
                 "total_files": 0,
                 "total_pages": 0,
-                "chunks": 0,
-                "document_stats": []
+                "chunks": 0
             }
 
-        if not file.filename.lower().endswith(
-            ".pdf"
-        ):
+        if not file.filename.lower().endswith(".pdf"):
 
             return {
                 "message": "Only PDF files are allowed.",
                 "files": [],
                 "total_files": 0,
                 "total_pages": 0,
-                "chunks": 0,
-                "document_stats": []
+                "chunks": 0
             }
 
         # ----------------------------------------------------
-        # Remove previous PDFs
+        # DELETE ALL PREVIOUS PDFs
         # ----------------------------------------------------
 
         for old_filename in os.listdir(
             UPLOAD_DIR
         ):
 
-            if not old_filename.lower().endswith(
-                ".pdf"
-            ):
-
+            if not old_filename.lower().endswith(".pdf"):
                 continue
 
             old_path = os.path.join(
@@ -449,9 +422,7 @@ async def upload_pdf(
 
             try:
 
-                os.remove(
-                    old_path
-                )
+                os.remove(old_path)
 
                 print(
                     "Removed previous PDF:",
@@ -463,11 +434,11 @@ async def upload_pdf(
                 print(
                     "Could not remove old PDF:",
                     old_filename,
-                    e
+                    repr(e)
                 )
 
         # ----------------------------------------------------
-        # Safe filename
+        # SAFE FILENAME
         # ----------------------------------------------------
 
         safe_filename = os.path.basename(
@@ -480,7 +451,7 @@ async def upload_pdf(
         )
 
         # ----------------------------------------------------
-        # Save PDF
+        # SAVE
         # ----------------------------------------------------
 
         with open(
@@ -499,76 +470,26 @@ async def upload_pdf(
         )
 
         # ----------------------------------------------------
-        # Rebuild RAG
+        # REBUILD RAG
         # ----------------------------------------------------
 
         stats = rebuild_vector_database()
 
-        # ----------------------------------------------------
-        # Document information
-        # ----------------------------------------------------
-
-        pages = 0
-        chunks = 0
-
-        try:
-
-            reader = PdfReader(
-                file_path
-            )
-
-            pages = len(
-                reader.pages
-            )
-
-        except Exception as e:
-
-            print(
-                "Page count error:",
-                e
-            )
-
-        if vector_db is not None:
-
-            try:
-
-                for doc in (
-                    vector_db.docstore._dict.values()
-                ):
-
-                    if (
-                        doc.metadata.get("source")
-                        == safe_filename
-                    ):
-
-                        chunks += 1
-
-            except Exception as e:
-
-                print(
-                    "Chunk count error:",
-                    e
-                )
-
-        document_stats = [
-            {
-                "filename": safe_filename,
-                "pages": pages,
-                "chunks": chunks
-            }
-        ]
-
-        # ----------------------------------------------------
-        # Success response
-        # ----------------------------------------------------
-
         return {
-            "message": "PDF uploaded successfully",
-            "files": [safe_filename],
-            "total_files": 1,
-            "total_pages": stats["pages"],
-            "chunks": stats["chunks"],
-            "document_stats": document_stats
+            "message":
+                "PDF uploaded successfully",
+
+            "files":
+                [safe_filename],
+
+            "total_files":
+                1,
+
+            "total_pages":
+                stats["pages"],
+
+            "chunks":
+                stats["chunks"]
         }
 
     except Exception as e:
@@ -579,13 +500,11 @@ async def upload_pdf(
         )
 
         return {
-            "message": "Upload failed",
-            "error": str(e),
-            "files": [],
-            "total_files": 0,
-            "total_pages": 0,
-            "chunks": 0,
-            "document_stats": []
+            "message":
+                "Upload failed",
+
+            "error":
+                str(e)
         }
 
 
@@ -629,17 +548,18 @@ def delete_document(
             safe_filename
         )
 
-        # Rebuild
         stats = rebuild_vector_database()
 
         return {
             "success": True,
-            "message": (
-                f"{safe_filename} deleted successfully."
-            ),
-            "total_files": stats["documents"],
-            "total_pages": stats["pages"],
-            "chunks": stats["chunks"]
+            "message":
+                f"{safe_filename} deleted successfully.",
+            "total_files":
+                stats["documents"],
+            "total_pages":
+                stats["pages"],
+            "chunks":
+                stats["chunks"]
         }
 
     except Exception as e:
@@ -651,8 +571,10 @@ def delete_document(
 
         return {
             "success": False,
-            "message": "Delete failed.",
-            "error": str(e)
+            "message":
+                "Delete failed.",
+            "error":
+                str(e)
         }
 
 
@@ -668,7 +590,8 @@ def web_search(
     if tavily is None:
 
         return {
-            "error": "Tavily API key is not configured."
+            "error":
+                "Tavily API key is not configured."
         }
 
     try:
@@ -689,7 +612,8 @@ def web_search(
         )
 
         return {
-            "error": str(e)
+            "error":
+                str(e)
         }
 
 
@@ -703,9 +627,6 @@ class Question(BaseModel):
 
     use_web: bool = False
 
-    # Kept for frontend compatibility.
-    # The backend intentionally ignores multiple
-    # document selection because this is single-PDF mode.
     selected_documents: list[str] = Field(
         default_factory=list
     )
@@ -716,7 +637,7 @@ class Question(BaseModel):
 
 
 # ============================================================
-# FORMAT CHAT HISTORY
+# CHAT HISTORY
 # ============================================================
 
 def format_chat_history(
@@ -729,13 +650,11 @@ def format_chat_history(
 
     history_lines = []
 
-    recent_history = chat_history[-10:]
-
-    for message in recent_history:
+    for message in chat_history[-10:]:
 
         sender = message.get(
             "sender",
-            "unknown"
+            ""
         )
 
         text = message.get(
@@ -744,7 +663,6 @@ def format_chat_history(
         )
 
         if not text:
-
             continue
 
         if sender == "user":
@@ -783,10 +701,8 @@ def get_current_pdf():
     ]
 
     if not pdf_files:
-
         return None
 
-    # Safety: use only the first PDF.
     pdf_files.sort()
 
     return pdf_files[0]
@@ -804,7 +720,7 @@ async def ask_question(
     global vector_db
 
     print(
-        "========================================"
+        "\n========================================"
     )
 
     print(
@@ -818,7 +734,7 @@ async def ask_question(
     )
 
     print(
-        "Chat History Messages:",
+        "Chat History:",
         len(data.chat_history)
     )
 
@@ -837,22 +753,26 @@ async def ask_question(
         current_pdf
     )
 
-    if current_pdf is None:
+    # ========================================================
+    # IMPORTANT:
+    # WEB SEARCH CAN WORK WITHOUT PDF
+    # ========================================================
+
+    if current_pdf is None and not data.use_web:
 
         return {
             "question": data.question,
-            "answer": (
-                "Please upload a PDF first."
-            ),
+            "answer":
+                "Please upload a PDF first.",
             "sources": [],
             "web_sources": []
         }
 
     # ========================================================
-    # CHECK VECTOR DATABASE
+    # REBUILD PDF IF NECESSARY
     # ========================================================
 
-    if vector_db is None:
+    if current_pdf is not None and vector_db is None:
 
         try:
 
@@ -870,18 +790,6 @@ async def ask_question(
                 repr(e)
             )
 
-        if vector_db is None:
-
-            return {
-                "question": data.question,
-                "answer": (
-                    "The uploaded PDF could not be "
-                    "processed. Please upload it again."
-                ),
-                "sources": [],
-                "web_sources": []
-            }
-
     # ========================================================
     # CHAT HISTORY
     # ========================================================
@@ -891,38 +799,34 @@ async def ask_question(
     )
 
     # ========================================================
-    # RETRIEVAL QUERY
+    # PDF RETRIEVAL
     # ========================================================
 
-    retrieval_query = data.question
+    docs = []
 
-    # --------------------------------------------------------
-    # Rewrite follow-up questions
-    # --------------------------------------------------------
+    filtered_results = []
 
-    if data.chat_history:
+    if vector_db is not None and current_pdf:
 
-        rewrite_prompt = f"""
-You are a query rewriting assistant for a PDF RAG system.
+        retrieval_query = data.question
 
-Rewrite the CURRENT QUESTION into a standalone search query.
+        # ----------------------------------------------------
+        # Rewrite follow-up question
+        # ----------------------------------------------------
 
-Use the previous conversation only to understand references
-such as:
+        if data.chat_history:
 
-it
-this
-that
-they
-the paper
-the method
-the approach
-the model
-the problem
+            rewrite_prompt = f"""
+Rewrite the current user question into a
+standalone search query for a research paper.
+
+Use conversation only to resolve references
+such as "it", "this", "that", "the paper",
+"the method", or "the approach".
 
 Do NOT answer the question.
 
-Return ONLY the rewritten search query.
+Return ONLY the search query.
 
 PREVIOUS CONVERSATION:
 
@@ -931,170 +835,56 @@ PREVIOUS CONVERSATION:
 CURRENT QUESTION:
 
 {data.question}
-
-STANDALONE SEARCH QUERY:
 """
 
-        try:
+            try:
 
-            rewrite_response = llm.invoke(
-                rewrite_prompt
-            )
+                rewrite_response = llm.invoke(
+                    rewrite_prompt
+                )
 
-            rewritten_query = (
-                getattr(
+                rewritten = getattr(
                     rewrite_response,
                     "content",
                     ""
                 )
-                or ""
-            )
 
-            rewritten_query = (
-                rewritten_query
-                .strip()
-                .replace(
-                    "\n",
-                    " "
-                )
-            )
+                if rewritten:
 
-            if rewritten_query:
+                    rewritten = (
+                        str(rewritten)
+                        .strip()
+                        .replace(
+                            "\n",
+                            " "
+                        )
+                    )
 
-                retrieval_query = rewritten_query
+                    if rewritten:
+                        retrieval_query = rewritten
 
-        except Exception as e:
+            except Exception as e:
 
-            print(
-                "Query rewrite error:",
-                repr(e)
-            )
-
-            retrieval_query = data.question
-
-    print(
-        "Retrieval Query:",
-        retrieval_query
-    )
-
-    # ========================================================
-    # SEARCH QUERIES
-    # ========================================================
-
-    search_queries = [
-        retrieval_query
-    ]
-
-    # --------------------------------------------------------
-    # Query expansion
-    # --------------------------------------------------------
-
-    try:
-
-        expansion_prompt = f"""
-Create up to 3 alternative search queries for retrieving
-information from a research paper.
-
-Original question:
-
-{retrieval_query}
-
-Rules:
-
-- Keep the same meaning.
-- Use useful technical synonyms.
-- Do not answer the question.
-- Do not invent facts.
-- Return ONLY queries.
-- One query per line.
-- Do not number them.
-"""
-
-        expansion_response = llm.invoke(
-            expansion_prompt
-        )
-
-        expansion_text = (
-            getattr(
-                expansion_response,
-                "content",
-                ""
-            )
-            or ""
-        )
-
-        expanded_queries = []
-
-        for line in expansion_text.splitlines():
-
-            cleaned = line.strip()
-
-            if not cleaned:
-
-                continue
-
-            if len(cleaned) >= 2:
-
-                if (
-                    cleaned[0].isdigit()
-                    and cleaned[1] in [".", ")"]
-                ):
-
-                    cleaned = cleaned[2:].strip()
-
-            if cleaned:
-
-                expanded_queries.append(
-                    cleaned
+                print(
+                    "Rewrite error:",
+                    repr(e)
                 )
 
-        search_queries.extend(
-            expanded_queries[:3]
-        )
-
-    except Exception as e:
-
         print(
-            "Query expansion error:",
-            repr(e)
+            "Retrieval Query:",
+            retrieval_query
         )
 
-    search_queries = list(
-        dict.fromkeys(
-            search_queries
-        )
-    )
-
-    print(
-        "Search Queries:"
-    )
-
-    for query in search_queries:
-
-        print(
-            " -",
-            query
-        )
-
-    # ========================================================
-    # SINGLE-PDF RETRIEVAL
-    # ========================================================
-
-    document_results = []
-
-    print(
-        "Searching ONLY PDF:",
-        current_pdf
-    )
-
-    for query in search_queries:
+        # ----------------------------------------------------
+        # Retrieval
+        # ----------------------------------------------------
 
         try:
 
             results = (
                 vector_db
                 .similarity_search_with_score(
-                    query,
+                    retrieval_query,
                     k=30
                 )
             )
@@ -1112,7 +902,7 @@ Rules:
                     == current_pdf
                 ):
 
-                    document_results.append(
+                    filtered_results.append(
                         (
                             doc,
                             score
@@ -1126,177 +916,129 @@ Rules:
                 repr(e)
             )
 
-    # ========================================================
-    # REMOVE DUPLICATES
-    # ========================================================
+        # ----------------------------------------------------
+        # Remove duplicates
+        # ----------------------------------------------------
 
-    unique_results = {}
+        unique_results = {}
 
-    for doc, score in document_results:
+        for doc, score in filtered_results:
 
-        key = (
-            doc.metadata.get(
-                "source"
-            ),
-            doc.metadata.get(
-                "page"
-            ),
-            doc.page_content[:300]
+            key = (
+                doc.metadata.get("source"),
+                doc.metadata.get("page"),
+                doc.page_content[:300]
+            )
+
+            if (
+                key not in unique_results
+                or score < unique_results[key][1]
+            ):
+
+                unique_results[key] = (
+                    doc,
+                    score
+                )
+
+        filtered_results = list(
+            unique_results.values()
         )
 
-        if (
-            key not in unique_results
-            or score < unique_results[key][1]
-        ):
+        filtered_results.sort(
+            key=lambda item: item[1]
+        )
 
-            unique_results[key] = (
-                doc,
+        # ----------------------------------------------------
+        # Best chunks
+        # ----------------------------------------------------
+
+        selected_results = (
+            filtered_results[:8]
+        )
+
+        print(
+            "Retrieved chunks:",
+            len(selected_results)
+        )
+
+        for doc, score in selected_results:
+
+            print(
+                "Source:",
+                doc.metadata.get("source"),
+                "| Page:",
+                doc.metadata.get("page"),
+                "| Score:",
                 score
             )
 
-    filtered_results = list(
-        unique_results.values()
-    )
+        # ----------------------------------------------------
+        # Relevance
+        # ----------------------------------------------------
 
-    # ========================================================
-    # SORT BY SCORE
-    # ========================================================
+        RELEVANCE_THRESHOLD = 1.8
 
-    filtered_results.sort(
-        key=lambda item: item[1]
-    )
+        docs = [
+            doc
+            for doc, score in selected_results
+            if score <= RELEVANCE_THRESHOLD
+        ]
 
-    # ========================================================
-    # KEEP BEST 8 CHUNKS
-    # ========================================================
+        # ----------------------------------------------------
+        # Fallback
+        # ----------------------------------------------------
 
-    selected_results = (
-        filtered_results[:8]
-    )
+        if not docs and selected_results:
 
-    print(
-        "Selected chunks:",
-        len(selected_results)
-    )
+            print(
+                "No chunks passed threshold."
+            )
 
-    for doc, score in selected_results:
+            print(
+                "Using best chunks as fallback."
+            )
 
-        print(
-            "Source:",
-            doc.metadata.get(
-                "source"
-            ),
-            "| Page:",
-            doc.metadata.get(
-                "page"
-            ),
-            "| Score:",
-            score
-        )
-
-    # ========================================================
-    # RELEVANCE CHECK
-    # ========================================================
-
-    RELEVANCE_THRESHOLD = 1.8
-
-    docs = [
-        doc
-        for doc, score
-        in selected_results
-        if score <= RELEVANCE_THRESHOLD
-    ]
-
-    best_score = None
-
-    if selected_results:
-
-        best_score = min(
-            score
-            for doc, score
-            in selected_results
-        )
+            docs = [
+                doc
+                for doc, score
+                in selected_results[:5]
+            ]
 
     print(
-        "Best relevance score:",
-        best_score
-    )
-
-    print(
-        "Relevant chunks:",
+        "Relevant PDF chunks:",
         len(docs)
     )
 
     # ========================================================
-    # FALLBACK
+    # PDF CONTEXT
     # ========================================================
 
-    # If the retrieval system found chunks but the threshold
-    # rejected all of them, use the best chunks rather than
-    # immediately refusing to answer.
-    #
-    # This prevents reasonable questions from failing because
-    # of a small similarity-score difference.
-    # ========================================================
+    pdf_context = ""
 
-    if not docs and selected_results:
+    if docs:
 
-        print(
-            "No chunks passed threshold."
+        context_parts = []
+
+        for doc in docs:
+
+            source = doc.metadata.get(
+                "source",
+                current_pdf
+            )
+
+            page = doc.metadata.get(
+                "page",
+                "Unknown"
+            )
+
+            context_parts.append(
+                f"[PDF: {source} | PAGE: {page}]\n"
+                f"{doc.page_content}"
+            )
+
+        pdf_context = "\n\n".join(
+            context_parts
         )
-
-        print(
-            "Using best retrieved chunks as fallback."
-        )
-
-        docs = [
-            doc
-            for doc, score
-            in selected_results[:5]
-        ]
-
-    # ========================================================
-    # NO PDF CONTEXT
-    # ========================================================
-
-    if not docs:
-
-        return {
-            "question": data.question,
-            "answer": (
-                "The available PDF content does not contain "
-                "enough information to answer this question."
-            ),
-            "sources": [],
-            "web_sources": []
-        }
-
-    # ========================================================
-    # BUILD PDF CONTEXT
-    # ========================================================
-
-    context_parts = []
-
-    for doc in docs:
-
-        source = doc.metadata.get(
-            "source",
-            current_pdf
-        )
-
-        page = doc.metadata.get(
-            "page",
-            "Unknown"
-        )
-
-        context_parts.append(
-            f"[PDF: {source} | PAGE: {page}]\n"
-            f"{doc.page_content}"
-        )
-
-    pdf_context = "\n\n".join(
-        context_parts
-    )
 
     print(
         "PDF context length:",
@@ -1320,7 +1062,6 @@ Rules:
         )
 
         if not source:
-
             continue
 
         if source not in pdf_sources_map:
@@ -1336,16 +1077,14 @@ Rules:
     pdf_sources = [
         {
             "source": source,
-            "pages": sorted(
-                pages
-            )
+            "pages": sorted(pages)
         }
         for source, pages
         in pdf_sources_map.items()
     ]
 
     # ========================================================
-    # WEB VARIABLES
+    # WEB SEARCH VARIABLES
     # ========================================================
 
     web_context = ""
@@ -1358,15 +1097,23 @@ Rules:
 
     if data.use_web:
 
+        print(
+            "WEB SEARCH ENABLED"
+        )
+
         if tavily is None:
 
             print(
-                "Web Search requested but Tavily is not configured."
+                "Tavily is not configured."
             )
 
         else:
 
             try:
+
+                # ------------------------------------------------
+                # Build web query
+                # ------------------------------------------------
 
                 web_query_prompt = f"""
 Create ONE concise web search query.
@@ -1375,34 +1122,39 @@ The user asks:
 
 {data.question}
 
-The uploaded PDF discusses:
+Current year: 2026.
 
-{pdf_context[:6000]}
+Previous conversation:
 
-The query should:
+{chat_history_text}
 
-1. Focus on the same subject as the PDF.
-2. Focus on the user's current question.
-3. Use important technical keywords.
-4. Avoid unrelated topics.
-5. Return ONLY the search query.
+PDF context, if available:
+
+{pdf_context[:5000]}
+
+Rules:
+
+1. Focus on the user's current question.
+2. If the user asks for latest/current/recent information,
+   search for current information.
+3. If the question refers to the PDF, keep the same topic.
+4. Include important technical keywords.
+5. Do not answer the question.
+6. Return ONLY the search query.
 """
 
-                web_query_response = llm.invoke(
+                query_response = llm.invoke(
                     web_query_prompt
                 )
 
-                focused_query = (
-                    getattr(
-                        web_query_response,
-                        "content",
-                        ""
-                    )
-                    or ""
+                focused_query = getattr(
+                    query_response,
+                    "content",
+                    ""
                 )
 
                 focused_query = (
-                    focused_query
+                    str(focused_query or "")
                     .strip()
                     .replace(
                         "\n",
@@ -1422,16 +1174,27 @@ The query should:
                     focused_query
                 )
 
+                # ------------------------------------------------
+                # Tavily
+                # ------------------------------------------------
+
                 results = tavily.search(
                     query=focused_query,
                     search_depth="advanced",
                     max_results=5
                 )
 
-                for item in results.get(
+                web_items = results.get(
                     "results",
                     []
-                ):
+                )
+
+                print(
+                    "Web results:",
+                    len(web_items)
+                )
+
+                for item in web_items:
 
                     title = item.get(
                         "title",
@@ -1458,9 +1221,10 @@ The query should:
                         )
 
                     web_context += (
-                        f"\nTitle: {title}\n"
+                        f"\n"
+                        f"Title: {title}\n"
                         f"Content: {content}\n"
-                        f"URL: {url}\n\n"
+                        f"URL: {url}\n"
                     )
 
             except Exception as e:
@@ -1471,7 +1235,22 @@ The query should:
                 )
 
     # ========================================================
-    # FINAL PROMPT
+    # NO PDF + NO WEB
+    # ========================================================
+
+    if not docs and not data.use_web:
+
+        return {
+            "question": data.question,
+            "answer":
+                "The available PDF content does not contain "
+                "enough information to answer this question.",
+            "sources": [],
+            "web_sources": []
+        }
+
+    # ========================================================
+    # NO PDF BUT WEB IS AVAILABLE
     # ========================================================
 
     if data.use_web and web_context.strip():
@@ -1481,37 +1260,47 @@ You are an AI Research Assistant.
 
 The user has uploaded ONE PDF.
 
+Web Search is ENABLED.
+
 Answer the CURRENT QUESTION using:
 
-1. The uploaded PDF as the primary source.
-2. The relevant web search results.
-3. Previous conversation ONLY to understand references.
+1. PDF information when relevant.
+2. Web Search information when the PDF does not contain
+   enough information.
+3. Previous conversation only to understand references.
 
-IMPORTANT RULES:
+IMPORTANT:
 
-- Do not invent facts.
-- Do not use unrelated web information.
-- Web information must be relevant to the PDF topic.
-- Do not treat previous conversation as factual evidence.
-- Clearly distinguish PDF information from web information.
-- Stay directly related to the user's question.
-- Give a detailed answer when the question asks for detail.
+- Do NOT invent facts.
+- Do NOT use unrelated information.
+- Current/latest questions should use the web results.
+- If the PDF does not contain the answer, use the web.
+- Clearly distinguish PDF information and web information.
+- Give a detailed answer.
+- Do not refuse merely because the PDF does not contain
+  the answer.
 
-Use this structure:
+Use EXACTLY this structure:
 
 ## 📄 Information from the PDF
 
-Give a detailed answer based on the PDF.
+Explain the relevant information from the uploaded PDF.
+
+If the PDF does not contain relevant information,
+write:
+
+The PDF does not contain enough information about
+this specific question.
 
 ## 🌐 Additional Information from the Web
 
-Give only relevant information from the web.
+Explain the relevant information found through Web Search.
 
 ## 💡 Key Takeaways
 
-- Important supported point
-- Important supported point
-- Important supported point
+- Important point
+- Important point
+- Important point
 
 PREVIOUS CONVERSATION:
 
@@ -1521,9 +1310,49 @@ PDF CONTEXT:
 
 {pdf_context}
 
-WEB CONTEXT:
+WEB SEARCH CONTEXT:
 
 {web_context}
+
+CURRENT QUESTION:
+
+{data.question}
+
+ANSWER:
+"""
+
+    elif data.use_web:
+
+        prompt = f"""
+You are an AI Research Assistant.
+
+Web Search was requested, but no useful web results
+were retrieved.
+
+Answer using the uploaded PDF if possible.
+
+If the PDF does not contain enough information, say so.
+
+Do NOT invent facts.
+
+Use this structure:
+
+## 📄 Information from the PDF
+
+[Relevant PDF information]
+
+## 🌐 Additional Information from the Web
+
+No relevant web information was retrieved.
+
+## 💡 Key Takeaways
+
+- Important supported point
+- Important supported point
+
+PDF CONTEXT:
+
+{pdf_context}
 
 CURRENT QUESTION:
 
@@ -1535,54 +1364,36 @@ ANSWER:
     else:
 
         prompt = f"""
-You are a strict PDF-based AI Research Assistant.
+You are a strict PDF Research Assistant.
 
-The user has uploaded ONE PDF.
+Answer the user's question using ONLY the uploaded PDF.
 
-Answer the CURRENT QUESTION using ONLY the PDF CONTEXT.
+Do NOT use outside knowledge.
 
-IMPORTANT RULES:
+Do NOT invent facts.
 
-1. Use ONLY information supported by the PDF.
-2. Do NOT use your own general knowledge.
-3. Do NOT use information from the internet.
-4. Do NOT guess.
-5. Do NOT invent facts.
-6. Previous conversation may ONLY be used to understand
-   references such as "it", "this", "that", "they",
-   "the method", or "the approach".
-7. Previous conversation is NOT factual evidence.
-8. Give a COMPLETE and DETAILED answer when the PDF
-   contains enough information.
-9. If the question asks for contributions, explain
-   each contribution separately.
-10. If the question asks for methodology, explain
-    the methodology clearly and step by step.
-11. If the question asks for findings or results,
-    explain the findings supported by the PDF.
-12. Do not make the answer short just because the
-    question is simple.
-13. Do not add facts merely to make the answer longer.
-14. Every factual statement must be supported by
-    the PDF CONTEXT.
+Previous conversation can ONLY be used to
+understand references.
 
-If the PDF genuinely does not contain enough information,
-respond ONLY with:
+Give a detailed answer.
 
-The available PDF content does not contain enough
-information to answer this question.
-
-Otherwise use:
+If the PDF contains enough information, use:
 
 ## 📄 Detailed Answer
 
-[Detailed answer based ONLY on the PDF.]
+[Detailed answer]
 
 ## 💡 Key Takeaways
 
-- Supported point
-- Supported point
-- Supported point
+- Important point
+- Important point
+- Important point
+
+If the PDF genuinely does not contain enough
+information, say:
+
+The available PDF content does not contain enough
+information to answer this question.
 
 PREVIOUS CONVERSATION:
 
@@ -1600,7 +1411,7 @@ ANSWER:
 """
 
     # ========================================================
-    # GENERATE FINAL ANSWER
+    # GENERATE ANSWER
     # ========================================================
 
     print(
@@ -1613,29 +1424,16 @@ ANSWER:
             prompt
         )
 
-        # ----------------------------------------------------
-        # Protect against None
-        # ----------------------------------------------------
-
         if response is None:
-
-            print(
-                "LLM returned None."
-            )
 
             return {
                 "question": data.question,
-                "answer": (
+                "answer":
                     "The AI model did not return an answer. "
-                    "Please try again."
-                ),
+                    "Please try again.",
                 "sources": pdf_sources,
                 "web_sources": web_sources
             }
-
-        # ----------------------------------------------------
-        # Extract content
-        # ----------------------------------------------------
 
         final_answer = getattr(
             response,
@@ -1643,12 +1441,8 @@ ANSWER:
             ""
         )
 
-        if final_answer is None:
-
-            final_answer = ""
-
         final_answer = str(
-            final_answer
+            final_answer or ""
         ).strip()
 
         print(
@@ -1656,65 +1450,77 @@ ANSWER:
             len(final_answer)
         )
 
-        # ----------------------------------------------------
-        # Empty response
-        # ----------------------------------------------------
-
         if not final_answer:
 
             return {
                 "question": data.question,
-                "answer": (
+                "answer":
                     "The AI model did not return an answer. "
-                    "Please try again."
-                ),
+                    "Please try again.",
                 "sources": pdf_sources,
                 "web_sources": web_sources
             }
 
-        # ----------------------------------------------------
-        # Unsupported-answer detection
-        # ----------------------------------------------------
+        # ====================================================
+        # NO ANSWER CHECK
+        # ====================================================
 
         no_answer_phrases = [
             "the available pdf content does not contain enough information",
-            "the answer could not be found in the uploaded documents",
-            "does not contain enough information to answer"
+            "does not contain enough information to answer",
+            "the answer could not be found in the uploaded documents"
         ]
 
+        answer_lower = final_answer.lower()
+
         is_no_answer = any(
-            phrase in final_answer.lower()
+            phrase in answer_lower
             for phrase in no_answer_phrases
         )
 
-        if is_no_answer:
+        # ----------------------------------------------------
+        # WEB SEARCH HAS RESULTS
+        # ----------------------------------------------------
 
-            return {
-                "question": data.question,
-                "answer": (
-                    "The available PDF content does not contain "
-                    "enough information to answer this question."
-                ),
-                "sources": [],
-                "web_sources": []
-            }
+        if (
+            is_no_answer
+            and data.use_web
+            and web_context.strip()
+        ):
+
+            print(
+                "PDF insufficient, but web context exists."
+            )
+
+            # Do NOT reject the answer.
+            # The web is allowed to provide the answer.
+
+        # ----------------------------------------------------
+        # PDF ONLY
+        # ----------------------------------------------------
+
+        elif (
+            is_no_answer
+            and not data.use_web
+        ):
+
+            final_answer = (
+                "The available PDF content does not contain "
+                "enough information to answer this question."
+            )
+
+            pdf_sources = []
 
         # ====================================================
-        # SUCCESS RESPONSE
+        # FINAL RESPONSE
         # ====================================================
 
-        result = {
+        return {
             "question": data.question,
             "answer": final_answer,
             "sources": pdf_sources,
             "web_sources": web_sources
         }
-
-        print(
-            "Returning answer successfully."
-        )
-
-        return result
 
     except Exception as e:
 
@@ -1725,10 +1531,9 @@ ANSWER:
 
         return {
             "question": data.question,
-            "answer": (
+            "answer":
                 "An error occurred while generating "
-                "the answer. Please try again."
-            ),
+                "the answer. Please try again.",
             "sources": pdf_sources,
             "web_sources": web_sources,
             "error": str(e)
