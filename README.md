@@ -456,7 +456,7 @@ Generative AI / RAG Project
 
 | Resource         | Link                                             |
 | ---------------- | ------------------------------------------------ |
-| 🌐 Live Frontend | https://ai-rag-project-psi.vercel.app            |
+| 🌐 Live Frontend | https://ai-rag-project-gadesrinam0-3714s-projects.vercel.app         |
 | ⚙️ Backend API   | https://ai-rag-project-production.up.railway.app |
 | 💻 GitHub        | https://github.com/srinamgade/ai-rag-project     |
 
