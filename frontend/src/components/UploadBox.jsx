@@ -16,7 +16,7 @@ function UploadBox() {
     setFileName(file.name);
 
     const formData = new FormData();
-    formData.append("file", file);
+    formData.append("files", file);
 
     try {
       const response = await axios.post(
