@@ -23,11 +23,7 @@ function UploadBox() {
         "https://ai-rag-project-production.up.railway.app/upload",
 
         formData,
-        {
-          headers: {
-            "Content-Type": "multipart/form-data",
-          },
-        }
+        
       );
 
       console.log(response.data);
